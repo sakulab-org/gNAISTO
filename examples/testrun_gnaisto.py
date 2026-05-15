@@ -1,8 +1,8 @@
 import numpy as np
-import pandas as pd
 
 from gnaisto import estimate_regulation, prepare_data, signed_edge_symmetrize
 from gnaisto.data_utils import simulate_data, list_random_extract_network_matrix
+from gnaisto.plot_utils import plot_all_estimated_regulation_weights
 
 def main():
     use_example_data = True
@@ -12,7 +12,6 @@ def main():
         expression, genename, samplename, regulation_test = prepare_data(fn_expression, fn_regulation)
         regulation_test = signed_edge_symmetrize(regulation_test)
         num_node_given = np.sum((regulation_test != 0).any(axis=0))
-        
     else:
         ### Make simulated data
         num_node = 100
@@ -30,11 +29,13 @@ def main():
         regulation_test[num_node_given:, :] = 0
         regulation_test[:, num_node_given:] = 0
         genename = [f"K{i}" for i in range(num_node_given)] + [f"U{i}" for i in range(num_node_given, num_node)]
-        samplename = [f"Sample{i}" for i in range(num_sample)]
         
-    hypparam = {'alpha': 2,  'beta': 1, 'gamma': 1e-5}
+    hypparam = {'alpha': 2,  'beta': 1, 'gamma': 1e-3}
     regulation_estim, table_regulation_estim = estimate_regulation(expression, method="gNAISTO", reg_known=regulation_test, hypparam=hypparam, num_core=8, genename=genename)
-    table_regulation_estim.to_csv("estimated_regulation.csv", index=False)
-
+    
+    table_regulation_estim.to_csv("estimated_regulation.csv", index=False)    
+    if not use_example_data:
+        plot_all_estimated_regulation_weights(regulation_estim[:num_node_given, num_node_given:], given=regulation[:num_node_given, num_node_given:])
+        
 if __name__ == "__main__":
     main()
