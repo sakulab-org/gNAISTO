@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: gnaisto
+Version: 0.1.0
+Summary: Graphical Network Assembly and Inference using Stepwise Testing with Optimization
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: numpy<2.0,>=1.26
+Requires-Dist: pandas<3.0,>=2.2
+Requires-Dist: scipy<2.0,>=1.15
+Requires-Dist: scikit-learn<2.0,>=1.6
+Requires-Dist: networkx<4.0,>=3.4
+Requires-Dist: joblib<2.0,>=1.4
+Requires-Dist: matplotlib<4.0,>=3.10
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: matplotlib<4.0,>=3.10; extra == "dev"
+Requires-Dist: graphviz<1.0,>=0.20; extra == "dev"

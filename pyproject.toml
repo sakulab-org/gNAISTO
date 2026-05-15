@@ -1,0 +1,29 @@
+[project]
+name = "gnaisto"
+version = "0.1.0"
+description = "Graphical Network Assembly and Inference using Stepwise Testing with Optimization"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26,<2.0",
+    "pandas>=2.2,<3.0",
+    "scipy>=1.15,<2.0",
+    "scikit-learn>=1.6,<2.0",
+    "networkx>=3.4,<4.0",
+    "joblib>=1.4,<2.0",
+    "matplotlib>=3.10,<4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "matplotlib>=3.10,<4.0",
+    "graphviz>=0.20,<1.0",
+]
+
+[build-system]
+requires = ["setuptools>=75", "wheel>=0.45"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

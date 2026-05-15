@@ -1,0 +1,12 @@
+numpy<2.0,>=1.26
+pandas<3.0,>=2.2
+scipy<2.0,>=1.15
+scikit-learn<2.0,>=1.6
+networkx<4.0,>=3.4
+joblib<2.0,>=1.4
+matplotlib<4.0,>=3.10
+
+[dev]
+pytest
+matplotlib<4.0,>=3.10
+graphviz<1.0,>=0.20
