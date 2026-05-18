@@ -98,8 +98,6 @@ gnaisto/
 
 The code for replicating the results in the paper is available in [the gNAISTO-paper repository](https://github.com/sakulab-org/gNAISTO-paper).
 
-```
-
 ## License
 
 This project is licensed under the MIT License.
