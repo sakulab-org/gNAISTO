@@ -70,7 +70,14 @@ def prepare_data(expression_file, regulation_file, flag_boxcox=False, flag_trans
         target_idx = np.where(genename == row["Target"])[0]
         regulation_matrix[source_idx, target_idx] = row["Effect"]
     np.fill_diagonal(regulation_matrix, 0)
-        
+    
+    # Reorder genes by whether they have known regulation
+    has_known_regulation = (np.sum(regulation_matrix != 0, axis=0) > 0) | (np.sum(regulation_matrix != 0, axis=1) > 0)
+    new_order = np.concatenate([np.where(has_known_regulation)[0], np.where(~has_known_regulation)[0]])
+    expr_data = expr_data[:, new_order]
+    genename = genename[new_order]
+    regulation_matrix = regulation_matrix[np.ix_(new_order, new_order)]
+
     # Filter out isolated genes if flag_noiso is True 
     if flag_noiso:
         print(f"  Filtering isolated genes...")

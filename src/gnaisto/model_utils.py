@@ -37,33 +37,26 @@ def make_printer(flag_parallel=False):
 # ================================
 # Estimations 
 # ================================
-def estimate_regulation(expr, method, hypparam, **kwargs):
+def estimate_regulation(expr, method, hypparam, reg_known=None, num_gene_reg_known=None, **kwargs):
     """Estimate regulatory interactions with prior knowledge."""
     print("")
-    # centering expr
-    if not method in ["S3VM"]:
-        print("Centering expression data...")
-        mean_expr = expr.mean(axis=0, keepdims=True)
-        expr = expr - mean_expr
 
-    num_core = kwargs.get('num_core', 1)
-    reg_known = kwargs.get('reg_known', None)
     if method in methodlist_undirected and method in methodlist_semisupervised:
         print("Making known regulation undirected...")
         reg_known = signed_edge_symmetrize(reg_known)
-    if method in methodlist_semisupervised and np.all(reg_known == 0):
-        raise ValueError(f"estimate_regulation - {method}: No known regulation provided after making undirected.")
+    if method in methodlist_semisupervised:
+        if reg_known is None or np.all(reg_known == 0):
+            raise ValueError(f"estimate_regulation - {method}: No known regulation provided after making undirected.")
     
-    num_gene_reg_known = kwargs.get('num_gene_reg_known', None)
     if reg_known is not None and num_gene_reg_known is None:
         is_reg_given = (np.abs(reg_known).sum(axis=1) > 0) | (np.abs(reg_known).sum(axis=0) > 0)
         maxidx_reg_given = np.max(np.nonzero(is_reg_given))
         num_gene_reg_known = maxidx_reg_given+1
-
+    num_core = kwargs.get('num_core', 1)
     genename = kwargs.get('genename', None)
     if genename is None:
         genename = [f"Gene{i}" for i in range(expr.shape[1])]
-
+        
     print(f"Estimating regulation with method: {method}...")
     if method in  ["NAISTO", "g2LASSO", "gNAISTO", "g3LASSO", "gNAISTOz", "pergenewLASSO", "pergenewgLASSO", "wgLASSO"]:
         reg_prior = kwargs.get('reg_prior', None)
@@ -110,18 +103,44 @@ def estimate_regulation(expr, method, hypparam, **kwargs):
     return reg_estim, table_reg_estim
 
 def estimate_regulation_naisto(expr, reg_known, num_gene_reg_known, method, hypparam, reg_prior=None, num_core=1, opt_gregress={}):
-    methodlist_all = ["NAISTO", "g2LASSO", "gNAISTO", "g3LASSO", "gNAISTOz", "pergenewLASSO", "pergenewgLASSO", "wgLASSO"]
+    S = np.cov(expr[:, :num_gene_reg_known], rowvar=False)
+    theta_raw = np.linalg.inv(S)
+    theta_raw_known = theta_raw * reg_known[:num_gene_reg_known, :][:, :num_gene_reg_known]
+    theta_raw_known_abs = np.abs(theta_raw_known[theta_raw_known<0])
+    mean_theta_raw_known_abs = np.mean(theta_raw_known_abs)
+                
     if method in ["NAISTO", "g2LASSO", "gNAISTO", "g3LASSO", "gNAISTOz"]:
         method_regress = "GGlasso" 
+
+        betainv_thetarel = hypparam.get('betainv_thetarel', None)
+        gammamode_thetarel = hypparam.get('gammamode_thetarel', None)
+
         alpha = hypparam.get('alpha', None)
         beta = hypparam.get('beta', None)
         gammamode = hypparam.get('gammamode', None)
+
+        if betainv_thetarel is not None:
+            if beta is not None:
+                raise ValueError("Cannot specify both beta and betainv_thetarel.")
+            betainv = betainv_thetarel * mean_theta_raw_known_abs
+            beta = 1 / betainv
+            hypparam['beta'] = beta
+        if gammamode_thetarel is not None:
+            if gammamode is not None:
+                raise ValueError("Cannot specify both gammamode and gammamode_thetarel.")
+            gammamode = gammamode_thetarel * mean_theta_raw_known_abs
+
         if alpha is None or beta is None:
             if gammamode is not None and beta is not None:
                 alpha = gammamode * beta + 1
                 hypparam['alpha'] = alpha
+            elif gammamode is not None and alpha is not None:
+                beta = (alpha - 1) / gammamode
+                hypparam['beta'] = beta
+                
     elif method in ["pergenewLASSO", "pergenewgLASSO", "wgLASSO"]:
         method_regress = "wLasso"
+
     if method in ["gNAISTO", "g3LASSO", "gNAISTOz"]:
         method_glasso = "gammaguided"
     elif method in ["pergenewgLASSO", "wgLASSO"]:
@@ -829,7 +848,7 @@ def estimate_precision_by_nonsmooth_weighted_regression(X, P_Q, method_glasso, h
 # ================================
 # Evaluations
 # ================================
-def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method, eval_method_opts, hypparam, **kwargs):
+def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method, eval_method_opts, hypparam, reg_known, num_gene_reg_known, **kwargs):
     """
     Estimate regulatory effects and evaluate based on the specified method.
     """
@@ -842,20 +861,20 @@ def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method
     if eval_method == "MAP_BlindGeneRegRanksum" :
         # Estimated regulation of blinded regulation of a gene, and calculate the correct ratio of the estimated regulation
         print("Evaluating MAP Blind Gene Regulation...")
-        reg_known = kwargs.get('reg_known')
         i,j = np.nonzero(reg_known)
-        geneinknown = np.unique(np.concatenate([i, j]))
+        # geneinknown = np.unique(np.concatenate([i, j]))
+        geneinknown = np.arange(num_gene_reg_known)
         num_gene = expr.shape[1]
         
         if "unknowngenenum" in eval_method_opts.keys():
             seed = eval_method_opts.get("seed")
             random.seed(seed) 
             unknowngenenum = eval_method_opts["unknowngenenum"]
-            geneinunknown = sorted(random.sample(range(len(geneinknown), num_gene), unknowngenenum))
+            geneinunknown = sorted(random.sample(range(num_gene_reg_known, num_gene), unknowngenenum))
             gene_eval = np.concatenate([geneinknown,geneinunknown])
 
         blindfold = eval_method_opts.get("blindfold", None)
-        if blindfold is not None and len(geneinknown) != blindfold:
+        if blindfold is not None and num_gene_reg_known != blindfold:
             seed = eval_method_opts.get("seed")
             random.seed(seed) 
             list_geneblind = geneinknown.copy()
@@ -865,21 +884,21 @@ def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method
             list_geneblind = [[x] for x in geneinknown]
 
         reg_allest_list = []
-        reg_est = np.zeros((len(geneinknown), len(geneinknown)), dtype=float)
-        rank_reg_est = np.zeros((len(geneinknown), len(geneinknown)), dtype=int)
+        reg_est = np.zeros((num_gene_reg_known, num_gene_reg_known), dtype=float)
+        rank_reg_est = np.zeros((num_gene_reg_known, num_gene_reg_known), dtype=int)
         for geneblind in list_geneblind:
             print(time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
             print(f"Blind Gene Regulation: Gene {geneblind}...")
             idxorder = list(range(num_gene))
             for i in geneblind:
                 idxorder.remove(i)
-                idxorder.insert(len(geneinknown)-1, i)
+                idxorder.insert(num_gene_reg_known-1, i)
 
             reg_blindknown = reg_known.copy()
             reg_blindknown = reg_blindknown[idxorder, :][:, idxorder]
             for i in range(len(geneblind)):
-                reg_blindknown[len(geneinknown)-len(geneblind)+i, :] = 0
-                reg_blindknown[:, len(geneinknown)-len(geneblind)+i] = 0
+                reg_blindknown[num_gene_reg_known-len(geneblind)+i, :] = 0
+                reg_blindknown[:, num_gene_reg_known-len(geneblind)+i] = 0
             expr_now = expr[:, idxorder].copy()
 
             if "unknowngenenum" in eval_method_opts.keys():
@@ -893,24 +912,21 @@ def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method
                 print(" No known regulation. Skipped.")
                 continue
             
-            kwargs_blind = kwargs.copy()
-            kwargs_blind['reg_known'] = reg_blindknown
-            kwargs_blind['num_gene_reg_known'] = len(geneinknown)-len(geneblind)
-            reg_allest, _ = estimate_regulation(expr_now, estim_method, hypparam, **kwargs_blind)
+            reg_allest, _ = estimate_regulation(expr_now, estim_method, hypparam, reg_known=reg_blindknown, num_gene_reg_known=num_gene_reg_known-len(geneblind), **kwargs)
             reg_allest_list.append(reg_allest)
 
-            reg_allest_temp = reg_allest[:, :len(geneinknown)-len(geneblind)].copy()
-            reg_allest_temp[:len(geneinknown)-len(geneblind), :] = 0
+            reg_allest_temp = reg_allest[:, :num_gene_reg_known-len(geneblind)].copy()
+            reg_allest_temp[:num_gene_reg_known-len(geneblind), :] = 0
             rank_reg_allest = np.argsort(np.argsort(np.abs(reg_allest_temp).ravel()))
             rank_reg_allest = rank_reg_allest.reshape(reg_allest_temp.shape)
             rank_reg_allest[reg_allest_temp == 0] = 0
-            rank_reg_allest[reg_allest_temp != 0] = rank_reg_allest[reg_allest_temp != 0] - (len(geneinknown)-len(geneblind))**2 + 1 # exclude ranks of regulation between known genes
+            rank_reg_allest[reg_allest_temp != 0] = rank_reg_allest[reg_allest_temp != 0] - (num_gene_reg_known-len(geneblind))**2 + 1 # exclude ranks of regulation between known genes
 
             colidx = geneinknown.copy()
             colidx = colidx[~np.isin(colidx, geneblind)]
             for i, g in enumerate(geneblind):
-                reg_est[g, colidx] = reg_allest_temp[len(geneinknown)-len(geneblind)+i, :].copy()
-                rank_reg_est[g, colidx] = rank_reg_allest[len(geneinknown)-len(geneblind)+i, :].copy()
+                reg_est[g, colidx] = reg_allest_temp[num_gene_reg_known-len(geneblind)+i, :].copy()
+                rank_reg_est[g, colidx] = rank_reg_allest[num_gene_reg_known-len(geneblind)+i, :].copy()
         
         # Calculate the rank sum of the estimated regulation
         reg_est_flat = reg_est.flatten()
@@ -932,7 +948,7 @@ def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method
 
     return evalscore, reg_eval, isRegEstAllZero
 
-def evaluate_hyperparams(expr, estim_method, eval_method, eval_method_opts, hypparamgrid, **kwargs):
+def evaluate_hyperparams(expr, estim_method, eval_method, eval_method_opts, hypparamgrid, reg_known, num_gene_reg_known, **kwargs):
     """Evaluate hyperparameters based on the specified method."""
 
     print(f"Hyperparameter grid search for {estim_method}...")
@@ -952,7 +968,7 @@ def evaluate_hyperparams(expr, estim_method, eval_method, eval_method_opts, hypp
         # Evaluate the model with the current hyperparameters
         np.seterr(divide='ignore')
         hypparam = dict(zip(hypparamnames, hypparamval))
-        eval_score, reg_eval, isRegEstAllZero = evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method, eval_method_opts, hypparam, **kwargs)
+        eval_score, reg_eval, isRegEstAllZero = evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method, eval_method_opts, hypparam, reg_known, num_gene_reg_known, **kwargs)
         np.seterr(divide='warn')
         # Store the results
         row = hypparam.copy()

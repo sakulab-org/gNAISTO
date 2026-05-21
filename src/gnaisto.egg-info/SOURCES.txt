@@ -1,3 +1,5 @@
+LICENSE
+README.md
 pyproject.toml
 src/gnaisto/__init__.py
 src/gnaisto/data_utils.py

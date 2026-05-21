@@ -31,7 +31,7 @@ def main():
         genename = [f"K{i}" for i in range(num_node_given)] + [f"U{i}" for i in range(num_node_given, num_node)]
         
     hypparam = {'alpha': 2,  'beta': 1, 'gamma': 1e-3}
-    regulation_estim, table_regulation_estim = estimate_regulation(expression, method="gNAISTO", reg_known=regulation_test, hypparam=hypparam, num_core=8, genename=genename)
+    regulation_estim, table_regulation_estim = estimate_regulation(expression, method="gNAISTO", reg_known=regulation_test, num_gene_reg_known=num_node_given, hypparam=hypparam, num_core=1, genename=genename)
     
     table_regulation_estim.to_csv("estimated_regulation.csv", index=False)    
     if not use_example_data:
