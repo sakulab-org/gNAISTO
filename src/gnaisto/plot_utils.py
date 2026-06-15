@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
 import numpy as np
 import networkx as nx
+
 # from graphviz import Digraph, Graph
 
 def plot_regulatory_matrix_heatmap(
@@ -167,3 +169,5 @@ def draw_graphviz_graph2(regulation_matrix, node_names, color_dict=None,  fillco
         G.node(node, style='filled', fillcolor=fillcolor, color=color, penwidth='2')
 
     G.render()
+
+

@@ -24,7 +24,7 @@ methodlist_unsupervised = ["GENIE3", "gLASSO"]
 methodlist_semisupervised = [m for m in methodlist_all if not m in methodlist_unsupervised]
 methodlist_directed = ["NAISTO", "g2LASSO", "pergenewLASSO", "GENIE3", "PORTIA", "KOZscore"]
 methodlist_undirected = [m for m in methodlist_all if not m in methodlist_directed]
-
+methodlist_naisto = ["NAISTO", "g2LASSO", "gNAISTO", "g3LASSO", "gNAISTOz", "pergenewLASSO", "pergenewgLASSO", "wgLASSO"]
 def make_printer(flag_parallel=False):
     msg_list = []
     def print_(text="", end="\n"):
@@ -58,10 +58,11 @@ def estimate_regulation(expr, method, hypparam, reg_known=None, num_gene_reg_kno
         genename = [f"Gene{i}" for i in range(expr.shape[1])]
         
     print(f"Estimating regulation with method: {method}...")
-    if method in  ["NAISTO", "g2LASSO", "gNAISTO", "g3LASSO", "gNAISTOz", "pergenewLASSO", "pergenewgLASSO", "wgLASSO"]:
+    if method in methodlist_naisto:
         reg_prior = kwargs.get('reg_prior', None)
         opt_gregress = kwargs.get('opt_gregress', {})
-        reg_estim = estimate_regulation_naisto(expr, reg_known, num_gene_reg_known, method, hypparam, reg_prior=reg_prior, num_core=num_core, opt_gregress=opt_gregress)
+        mean_theta = kwargs.get('mean_theta', None)
+        reg_estim = estimate_regulation_naisto(expr, reg_known, num_gene_reg_known, method, hypparam, reg_prior=reg_prior, num_core=num_core, opt_gregress=opt_gregress, mean_theta=mean_theta)
     if method in ["gLASSO"]:
         warnings.filterwarnings("ignore", category=ConvergenceWarning)
         model = GraphicalLasso(alpha=hypparam["gamma"]/2) # /2 for adjusting to wgLASSO and gNAISTO definitions
@@ -102,15 +103,17 @@ def estimate_regulation(expr, method, hypparam, reg_known=None, num_gene_reg_kno
 
     return reg_estim, table_reg_estim
 
-def estimate_regulation_naisto(expr, reg_known, num_gene_reg_known, method, hypparam, reg_prior=None, num_core=1, opt_gregress={}):
-    S = np.cov(expr[:, :num_gene_reg_known], rowvar=False)
-    theta_raw = np.linalg.inv(S)
-    theta_raw_known = theta_raw * reg_known[:num_gene_reg_known, :][:, :num_gene_reg_known]
-    theta_raw_known_abs = np.abs(theta_raw_known[theta_raw_known<0])
-    mean_theta_raw_known_abs = np.mean(theta_raw_known_abs)
-                
+def estimate_regulation_naisto(expr, reg_known, num_gene_reg_known, method, hypparam, reg_prior=None, num_core=1, opt_gregress={}, mean_theta=None):    
+    hypparam = hypparam.copy()
     if method in ["NAISTO", "g2LASSO", "gNAISTO", "g3LASSO", "gNAISTOz"]:
         method_regress = "GGlasso" 
+
+        if mean_theta is None:
+            S = np.cov(expr[:, :num_gene_reg_known], rowvar=False)
+            theta_raw = np.linalg.inv(S)
+            theta_raw_known = theta_raw * reg_known[:num_gene_reg_known, :][:, :num_gene_reg_known]
+            theta_raw_known_abs = np.abs(theta_raw_known[theta_raw_known<0])
+            mean_theta = np.mean(theta_raw_known_abs)
 
         betainv_thetarel = hypparam.get('betainv_thetarel', None)
         gammamode_thetarel = hypparam.get('gammamode_thetarel', None)
@@ -122,13 +125,13 @@ def estimate_regulation_naisto(expr, reg_known, num_gene_reg_known, method, hypp
         if betainv_thetarel is not None:
             if beta is not None:
                 raise ValueError("Cannot specify both beta and betainv_thetarel.")
-            betainv = betainv_thetarel * mean_theta_raw_known_abs
+            betainv = betainv_thetarel * mean_theta
             beta = 1 / betainv
             hypparam['beta'] = beta
         if gammamode_thetarel is not None:
             if gammamode is not None:
                 raise ValueError("Cannot specify both gammamode and gammamode_thetarel.")
-            gammamode = gammamode_thetarel * mean_theta_raw_known_abs
+            gammamode = gammamode_thetarel * mean_theta
 
         if alpha is None or beta is None:
             if gammamode is not None and beta is not None:
@@ -866,6 +869,7 @@ def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method
         geneinknown = np.arange(num_gene_reg_known)
         num_gene = expr.shape[1]
         
+        gene_eval = np.arange(num_gene)
         if "unknowngenenum" in eval_method_opts.keys():
             seed = eval_method_opts.get("seed")
             random.seed(seed) 
@@ -911,8 +915,18 @@ def evaluate_regulation_semisupervise_estimation(expr, estim_method, eval_method
             if np.all(reg_blindknown == 0):
                 print(" No known regulation. Skipped.")
                 continue
-            
-            reg_allest, _ = estimate_regulation(expr_now, estim_method, hypparam, reg_known=reg_blindknown, num_gene_reg_known=num_gene_reg_known-len(geneblind), **kwargs)
+
+            kwarg_now = kwargs.copy()
+            if estim_method in methodlist_naisto:
+                S = np.cov(expr[:, :num_gene_reg_known], rowvar=False)
+                theta_raw = np.linalg.inv(S)
+                reg_known_nodir = signed_edge_symmetrize(reg_known[:num_gene_reg_known, :][:, :num_gene_reg_known])
+                theta_raw_known = theta_raw * reg_known_nodir
+                theta_raw_known_abs = np.abs(theta_raw_known[theta_raw_known<0])
+                mean_theta = np.mean(theta_raw_known_abs)
+                kwarg_now["mean_theta"] = mean_theta
+
+            reg_allest, _ = estimate_regulation(expr_now, estim_method, hypparam, reg_known=reg_blindknown, num_gene_reg_known=num_gene_reg_known-len(geneblind), **kwarg_now)
             reg_allest_list.append(reg_allest)
 
             reg_allest_temp = reg_allest[:, :num_gene_reg_known-len(geneblind)].copy()

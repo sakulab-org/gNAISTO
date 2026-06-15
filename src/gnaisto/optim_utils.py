@@ -408,8 +408,9 @@ def solve_nonsmooth_weighted_regression(X, y, P_Q, method, hypparam, A0=None, fl
         print(f" Diff. from initial: {obj_final - obj_initial}")
     
     if obj_final > obj_initial:
-        print("Warning: Final objective value is greater than initial value.")
-        print("Resetting A_est to initial guess.")
+        if verbose>0:
+            print("Warning: Final objective value is greater than initial value.")
+            print("Resetting A_est to initial guess.")
         is_success = False
         A_est = A0.copy()
     if not tolbreak:

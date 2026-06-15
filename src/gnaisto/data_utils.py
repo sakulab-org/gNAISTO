@@ -200,7 +200,8 @@ def list_random_extract_network_matrix(regulation_matrix, networkidx, num_nodes=
             tryidx+=1
             rng = random.Random(seed + tryidx)
             givennode = sample_connected_subgraph_randomwalk(candidate_G.to_undirected(), num_nodes, rng)
-
+            flag_fail = len(givennode) < num_nodes
+            
             # overlap check
             if flag_fail == False:
                 overlapratio = 0
