@@ -5,7 +5,7 @@ gNAISTO (graphical Network Assembly and Inference using Stepwise Testing with Op
 The method incorporates prior network information and evaluates each candidate gene individually to support network expansion. More details about the method and its performance can be found in the corresponding paper:
 
 ```
-Paper information will be added here.
+Kokaji, Toshiya, Kenta T. Suzuki, Katsuyuki Kunida, and Yuichi Sakumura. “Expanding Gene Regulatory Networks from Transcriptome Data through Graphical Modeling with Heterogeneous Priors.” Preprint, bioRxiv, June 16, 2026. https://doi.org/10.64898/2026.06.12.731835.
 ```
 
 ## Installation
@@ -103,5 +103,5 @@ The code for replicating the results in the paper is available in [the gNAISTO-p
 If you use this software, please cite the corresponding paper:
 
 ```text
-Citation information will be added here.
+Kokaji, Toshiya, Kenta T. Suzuki, Katsuyuki Kunida, and Yuichi Sakumura. “Expanding Gene Regulatory Networks from Transcriptome Data through Graphical Modeling with Heterogeneous Priors.” Preprint, bioRxiv, June 16, 2026. https://doi.org/10.64898/2026.06.12.731835.
 ```
